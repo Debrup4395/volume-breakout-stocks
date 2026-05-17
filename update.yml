@@ -1,0 +1,53 @@
+name: 📈 Update NSE Stock Data
+
+on:
+  # ── Auto-trigger every 30 minutes ──────────────────────────────────────
+  # GitHub Actions minimum interval is 5 minutes; 30 is fine.
+  # Runs Mon–Fri only (IST 09:30–16:30 = UTC 04:00–11:00)
+  schedule:
+    - cron: '0,30 4-11 * * 1-5'   # Every :00 and :30, Mon–Fri, 04:00–11:59 UTC
+
+  # ── Also allow manual trigger from GitHub UI ───────────────────────────
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force run even outside market hours?'
+        type: boolean
+        default: false
+
+jobs:
+  update-sheet:
+    name: Fetch BhavCopy & Update Google Sheet
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # 1. Check out repository
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Set up Python
+      - name: 🐍 Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # 3. Install dependencies
+      - name: 📦 Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 4. Run the update script
+      #    GCP_CREDENTIALS is stored as a GitHub secret (JSON string)
+      - name: 🚀 Run update_sheet.py
+        env:
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+          FORCE_RUN: ${{ github.event.inputs.force }}
+        run: python update_sheet.py
+
+      # 5. Report success timestamp
+      - name: ✅ Done
+        if: success()
+        run: echo "Sheet updated at $(date -u '+%Y-%m-%d %H:%M UTC')"
